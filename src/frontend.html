@@ -25,7 +25,9 @@ Only for education and study use.
     <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-6 shadow-lg">
       <div class="max-w-6xl mx-auto px-6">
         <h1 class="text-3xl font-bold">Clash ↔ 订阅链接 转换工具</h1>
-        <p class="mt-2 opacity-90">支持格式: proxies / payload (Proxy Providers) / 不带前缀的节点列表 | GitHub: <a href="https://github.com/siiway/subconverter-snippet">siiway/subconverter-snippet</a> | <a href="https://github.com/siiway/subconverter-snippet/blob/main/api.md">API 文档</a></p>
+        <p class="mt-2 opacity-90">支持格式: proxies / payload (Proxy Providers) / 不带前缀的节点列表 | GitHub: <a
+            href="https://github.com/siiway/subconverter-snippet">siiway/subconverter-snippet</a> | <a
+            href="https://github.com/siiway/subconverter-snippet/blob/main/api.md">API 文档</a></p>
       </div>
     </div>
 
@@ -108,25 +110,39 @@ Only for education and study use.
     const result = document.getElementById("result");
     const resultText = document.getElementById("result-text");
 
-    document.getElementById("to-links").onclick = () => {
-      const yaml = clashInput.value.trim();
-      if (!yaml) return alert("请先输入 Clash 配置");
-      const links = clashToLink(yaml);
-      linksInput.value = links;
-      showResult(links, "Clash → 订阅链接 转换完成");
-    };
-
     document.getElementById("to-clash").onclick = () => {
       const lines = linksInput.value.trim().split("\n").filter(Boolean);
       if (lines.length === 0) return alert("请先输入订阅链接");
+
       const mode = document.querySelector('input[name="output-mode"]:checked').value;
-      const yaml = linkToClash(lines, mode);
-      clashInput.value = yaml;
-      const modeText = mode === "payload" ? "payload:" : mode === "proxies" ? "proxies:" : "无前缀节点列表";
-      showResult(yaml, `订阅链接 → Clash 转换完成（${modeText}）`);
+      const result = linkToClash(lines, mode);   // 现在返回对象
+
+      if (result.success) {
+        clashInput.value = result.data;
+        showResult(result.data, `订阅链接 → Clash 转换完成（${modeText(mode)}）`);
+      } else {
+        showResult(result.data, "订阅链接 → Clash 转换失败", true);
+      }
     };
 
-    // 复制功能
+    document.getElementById("to-links").onclick = () => {
+      const yaml = clashInput.value.trim();
+      if (!yaml) return alert("请先输入 Clash 配置");
+
+      const result = clashToLink(yaml);
+
+      if (result.success) {
+        linksInput.value = result.data;
+        showResult(result.data, "Clash → 订阅链接 转换完成");
+      } else {
+        showResult(result.data, "Clash → 订阅链接 转换失败", true);
+      }
+    };
+    function modeText(mode) {
+      return mode === "payload" ? "payload:" : mode === "proxies" ? "proxies:" : "无前缀节点列表";
+    }
+
+    // 复制功能（不变）
     const copy = (text, msg) => {
       navigator.clipboard.writeText(text).then(() => alert(msg || "已复制到剪贴板"));
     };
@@ -134,7 +150,7 @@ Only for education and study use.
     document.getElementById("copy-links").onclick = () => copy(linksInput.value, "订阅链接复制成功");
     document.getElementById("copy-result").onclick = () => copy(resultText.textContent);
 
-    // 粘贴功能
+    // 粘贴功能（不变）
     const paste = async (el) => {
       try {
         el.value = await navigator.clipboard.readText();
@@ -143,9 +159,12 @@ Only for education and study use.
     document.getElementById("paste-clash").onclick = () => paste(clashInput);
     document.getElementById("paste-links").onclick = () => paste(linksInput);
 
-    function showResult(text, title) {
+    function showResult(text, title, isError = false) {
       resultText.textContent = text;
-      result.querySelector("div").innerHTML = `<strong class="text-green-800 text-lg">${title}</strong>`;
+      const titleElement = result.querySelector("div strong");
+      titleElement.textContent = title;
+      titleElement.className = isError ? "text-red-800 text-lg" : "text-green-800 text-lg";
+      result.className = isError ? "hidden mt-6 p-6 bg-red-50 border-2 border-red-300 rounded-lg" : "hidden mt-6 p-6 bg-green-50 border-2 border-green-300 rounded-lg";
       result.classList.remove("hidden");
       result.scrollIntoView({ behavior: "smooth" });
     }

@@ -10,28 +10,37 @@ import { parse as parseYaml, stringify as genYaml } from "yaml";
 export function linkToClash(
   links: string[],
   mode: ClashOutputMode = "proxies"
-): string {
+): ConvertResult {
   const nodes = links
     .map((link) => {
       try {
         const node = parseUri(link.trim());
         return node ? generateClashNode(node) : null;
-      } catch {
+      } catch (e: any) {
+        // 单个链接解析失败不中断整体
         return null;
       }
     })
     .filter(Boolean);
 
-  if (nodes.length === 0) return "# 无有效节点";
+  if (nodes.length === 0) {
+    return {
+      success: false,
+      data: "# 无有效节点（请检查链接格式是否正确）",
+    };
+  }
 
   const key = mode === "payload" ? "payload" : mode === "none" ? "" : "proxies";
   const prefix = key ? `${key}:\n` : "";
 
-  return prefix + nodes.join("\n");
+  return {
+    success: true,
+    data: prefix + nodes.join("\n"),
+  };
 }
 
 // ====================== 反向：Clash → 链接 ======================
-export function clashToLink(yamlText: string): string {
+export function clashToLink(yamlText: string): ConvertResult {
   try {
     const config = parseYaml(yamlText);
 
@@ -65,17 +74,24 @@ export function clashToLink(yamlText: string): string {
         }
       }
     }
-
     if (proxies.length === 0) {
-      return "# 未检测到任何节点（支持: proxies / payload / 节点数组）";
+      return {
+        success: false,
+        data: "# 未检测到任何节点（支持: proxies / payload / 节点数组）",
+      };
     }
 
-    return proxies
-      .map((node: any) => generateUri(node))
-      .filter(Boolean)
-      .join("\n");
+    const links = proxies.map((node: any) => generateUri(node)).filter(Boolean);
+
+    return {
+      success: true,
+      data: links.join("\n"),
+    };
   } catch (e: any) {
-    return `# YAML 解析失败：${e.message || e}`;
+    return {
+      success: false,
+      data: `# YAML 解析失败：${e.message || e}`,
+    };
   }
 }
 
@@ -575,6 +591,15 @@ function URI_VLESS(line: string): IProxyVlessConfig {
     }
     if (params.sid) {
       opts["short-id"] = params.sid;
+    }
+    if (params.spx) {
+      opts["spider-x"] = params.spx;
+    }
+    if (params.pqv) {
+      opts["mldsa65-verify"] = params.pqv;
+    }
+    if (params.ech) {
+      opts.ech = params.ech;
     }
     if (Object.keys(opts).length > 0) {
       proxy["reality-opts"] = opts;
@@ -1278,18 +1303,31 @@ export function generateUri(node: any): string {
       params.set("type", node.network || "tcp");
       params.set("encryption", "none");
       if (node.flow) params.set("flow", node.flow);
-      if (node.tls || node.reality) {
-        params.set("security", node.reality ? "reality" : "tls");
+
+      if (node.tls || node["reality-opts"]) {
+        const isReality = !!node["reality-opts"];
+        params.set("security", isReality ? "reality" : "tls");
+
         if (node.servername || node.sni)
           params.set("sni", node.servername || node.sni);
+
         if (node.fingerprint || node["client-fingerprint"])
           params.set("fp", node.fingerprint || node["client-fingerprint"]);
+
         if (node["skip-cert-verify"]) params.set("allowInsecure", "1");
-        if (node.reality) {
-          params.set("pbk", node.reality["public-key"]);
-          params.set("sid", node.reality["short-id"] || "");
+        if (node.alpn?.length) params.set("alpn", node.alpn.join(","));
+
+        // Reality 专属参数
+        if (isReality) {
+          const ro = node["reality-opts"];
+          if (ro["public-key"]) params.set("pbk", ro["public-key"]);
+          if (ro["short-id"]) params.set("sid", ro["short-id"] || "");
+          if (ro["spider-x"]) params.set("spx", ro["spider-x"]);
+          if (ro["mldsa65-verify"]) params.set("pqv", ro["mldsa65-verify"]);
+          if (ro.ech) params.set("ech", ro.ech);
         }
       }
+
       return link + "?" + params.toString() + `#${name}`;
 
     case "trojan":

@@ -1,4 +1,4 @@
-name: Build Artifacts
+name: Build Artifacts,
 
 on:
   push:
@@ -44,6 +44,13 @@ jobs:
 
           # 替换 Repo
           sed -i "s|Repo-Placeholder|\${{ github.repository }}|g" src/snippet.js
+      
+      - name: Delete old latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes || true
+          gh api repos/${{ github.repository }}/git/refs/tags/latest -X DELETE || true
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -56,6 +63,7 @@ jobs:
             dist/converter.bundle.js
           draft: false
           prerelease: false
+          preserve_order: true
           body: |
             在 **${{ steps.inject_core.outputs.UTC_TIME }}** *(UTC 时间)* 的自动构建
             配置的目标仓库: **`${{ github.repository }}`**

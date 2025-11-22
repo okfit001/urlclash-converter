@@ -389,7 +389,14 @@ interface GrpcOptions {
 interface RealityOptions {
   "public-key"?: string;
   "short-id"?: string;
+  "spider-x"?: string;
+  "mldsa65-verify"?: string;
+  ech?: string;
 }
 
 
 type ClashOutputMode = "proxies" | "payload" | "none";
+interface ConvertResult {
+  success: boolean;
+  data: string; // 成功时是节点列表或 YAML，失败时是错误说明（以 # 开头）
+}
